@@ -33,9 +33,37 @@ internal sealed class FileTransport : IDltTransport
         if (_disposed) throw new DltTransportException("FileTransport disposed");
 
         if (_stream is null) Open();
+
+        if (_bytesWritten + frame.Length > _fileSizeLimitBytes)
+            await RollAsync().ConfigureAwait(false);
+
         await _stream!.WriteAsync(frame, ct).ConfigureAwait(false);
         _bytesWritten += frame.Length;
         await _stream.FlushAsync(ct).ConfigureAwait(false);
+    }
+
+    private async ValueTask RollAsync()
+    {
+        if (_stream is not null)
+        {
+            await _stream.DisposeAsync().ConfigureAwait(false);
+            _stream = null;
+        }
+
+        var oldest = $"{_path}.{_retainedFileCountLimit - 1}";
+        if (File.Exists(oldest)) File.Delete(oldest);
+
+        for (var i = _retainedFileCountLimit - 2; i >= 0; i--)
+        {
+            var src = $"{_path}.{i}";
+            var dst = $"{_path}.{i + 1}";
+            if (File.Exists(src)) File.Move(src, dst, overwrite: true);
+        }
+
+        if (File.Exists(_path)) File.Move(_path, $"{_path}.0", overwrite: true);
+
+        _bytesWritten = 0;
+        Open();
     }
 
     private void Open()
