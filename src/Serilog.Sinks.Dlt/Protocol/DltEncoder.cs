@@ -39,6 +39,23 @@ internal static class DltEncoder
         BinaryPrimitives.WriteUInt16BigEndian(writable.Span.Slice(startOffset + 2, 2), checked((ushort)frameLength));
     }
 
+    public static void EncodeWithStorageHeader(in DltMessage msg, ArrayBufferWriter<byte> writer)
+    {
+        var hdr = writer.GetSpan(DltConstants.StorageHeaderSize);
+        DltConstants.StorageHeaderPattern.CopyTo(hdr);
+
+        var totalUs = msg.StorageWallClock.ToUnixTimeMilliseconds() * 1000L;
+        var secs = (uint)(totalUs / 1_000_000L);
+        var usecs = (int)(totalUs % 1_000_000L);
+
+        BinaryPrimitives.WriteUInt32LittleEndian(hdr.Slice(4, 4), secs);
+        BinaryPrimitives.WriteInt32LittleEndian(hdr.Slice(8, 4), usecs);
+        WriteId(hdr.Slice(12, 4), msg.EcuId);
+        writer.Advance(DltConstants.StorageHeaderSize);
+
+        Encode(msg, writer);
+    }
+
     private static void WriteId(Span<byte> dest, string id)
     {
         dest.Clear();
@@ -62,8 +79,21 @@ internal static class DltEncoder
             case DltArgumentKind.UInt64: WriteScalar8(writer, DltConstants.TypeInfoUint | DltConstants.TypeInfoLength64Bit, arg.AsUInt64()); return;
             case DltArgumentKind.Float32: WriteScalar4(writer, DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength32Bit, (uint)BitConverter.SingleToInt32Bits(arg.AsFloat32())); return;
             case DltArgumentKind.Float64: WriteScalar8(writer, DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength64Bit, (ulong)BitConverter.DoubleToInt64Bits(arg.AsFloat64())); return;
+            case DltArgumentKind.Raw:
+                WriteRaw(arg.AsRaw().Span, writer);
+                return;
             default: WriteString(arg.Kind.ToString(), writer); return;
         }
+    }
+
+    private static void WriteRaw(ReadOnlySpan<byte> data, ArrayBufferWriter<byte> writer)
+    {
+        var len = Math.Min(data.Length, ushort.MaxValue);
+        var span = writer.GetSpan(4 + 2 + len);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4], DltConstants.TypeInfoRaw);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(4, 2), (ushort)len);
+        data[..len].CopyTo(span.Slice(6, len));
+        writer.Advance(4 + 2 + len);
     }
 
     private static void WriteScalar1(ArrayBufferWriter<byte> w, uint info, byte v)

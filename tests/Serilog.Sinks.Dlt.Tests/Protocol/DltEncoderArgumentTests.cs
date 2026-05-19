@@ -100,4 +100,14 @@ public class DltEncoderArgumentTests
             .Should().Be(DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength64Bit);
         BinaryPrimitives.ReadDoubleLittleEndian(payload.AsSpan(4, 8)).Should().Be(double.MaxValue);
     }
+
+    [Fact]
+    public void Raw_writes_u16_length_then_bytes()
+    {
+        var data = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
+        var payload = EncodePayload(DltArgument.Raw(data));
+        BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4)).Should().Be(DltConstants.TypeInfoRaw);
+        BinaryPrimitives.ReadUInt16LittleEndian(payload.AsSpan(4, 2)).Should().Be(4);
+        payload.AsSpan(6, 4).ToArray().Should().Equal(data);
+    }
 }
