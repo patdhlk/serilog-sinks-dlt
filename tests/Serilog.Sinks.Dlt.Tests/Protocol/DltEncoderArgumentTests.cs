@@ -55,4 +55,49 @@ public class DltEncoderArgumentTests
         var payload = EncodePayload(DltArgument.Bool(false));
         payload[4].Should().Be(0);
     }
+
+    [Fact]
+    public void Int8_writes_signed_8bit()
+    {
+        var payload = EncodePayload(DltArgument.Int8(-7));
+        BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4))
+            .Should().Be(DltConstants.TypeInfoSint | DltConstants.TypeInfoLength8Bit);
+        ((sbyte)payload[4]).Should().Be(-7);
+    }
+
+    [Fact]
+    public void Int32_writes_signed_32bit_little_endian()
+    {
+        var payload = EncodePayload(DltArgument.Int32(-1234567));
+        BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4))
+            .Should().Be(DltConstants.TypeInfoSint | DltConstants.TypeInfoLength32Bit);
+        BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(4, 4)).Should().Be(-1234567);
+    }
+
+    [Fact]
+    public void UInt64_writes_unsigned_64bit_little_endian()
+    {
+        var payload = EncodePayload(DltArgument.UInt64(0xDEAD_BEEF_F00D_BABEul));
+        BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4))
+            .Should().Be(DltConstants.TypeInfoUint | DltConstants.TypeInfoLength64Bit);
+        BinaryPrimitives.ReadUInt64LittleEndian(payload.AsSpan(4, 8)).Should().Be(0xDEAD_BEEF_F00D_BABEul);
+    }
+
+    [Fact]
+    public void Float32_writes_ieee754_little_endian()
+    {
+        var payload = EncodePayload(DltArgument.Float32(3.14159f));
+        BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4))
+            .Should().Be(DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength32Bit);
+        BinaryPrimitives.ReadSingleLittleEndian(payload.AsSpan(4, 4)).Should().Be(3.14159f);
+    }
+
+    [Fact]
+    public void Float64_writes_ieee754_little_endian()
+    {
+        var payload = EncodePayload(DltArgument.Float64(double.MaxValue));
+        BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0, 4))
+            .Should().Be(DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength64Bit);
+        BinaryPrimitives.ReadDoubleLittleEndian(payload.AsSpan(4, 8)).Should().Be(double.MaxValue);
+    }
 }

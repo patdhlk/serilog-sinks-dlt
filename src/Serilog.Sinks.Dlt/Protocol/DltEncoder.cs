@@ -50,17 +50,52 @@ internal static class DltEncoder
     {
         switch (arg.Kind)
         {
-            case DltArgumentKind.String:
-                WriteString(arg.AsString(), writer);
-                break;
-            case DltArgumentKind.Bool:
-                WriteBool(arg.AsBool(), writer);
-                break;
-            default:
-                // Other kinds in Tasks 8-9.
-                WriteString(arg.Kind.ToString(), writer);
-                break;
+            case DltArgumentKind.String: WriteString(arg.AsString(), writer); return;
+            case DltArgumentKind.Bool:   WriteBool(arg.AsBool(), writer); return;
+            case DltArgumentKind.Int8:   WriteScalar1(writer, DltConstants.TypeInfoSint | DltConstants.TypeInfoLength8Bit, (byte)arg.AsInt8()); return;
+            case DltArgumentKind.UInt8:  WriteScalar1(writer, DltConstants.TypeInfoUint | DltConstants.TypeInfoLength8Bit, arg.AsUInt8()); return;
+            case DltArgumentKind.Int16:  WriteScalar2(writer, DltConstants.TypeInfoSint | DltConstants.TypeInfoLength16Bit, unchecked((ushort)arg.AsInt16())); return;
+            case DltArgumentKind.UInt16: WriteScalar2(writer, DltConstants.TypeInfoUint | DltConstants.TypeInfoLength16Bit, arg.AsUInt16()); return;
+            case DltArgumentKind.Int32:  WriteScalar4(writer, DltConstants.TypeInfoSint | DltConstants.TypeInfoLength32Bit, unchecked((uint)arg.AsInt32())); return;
+            case DltArgumentKind.UInt32: WriteScalar4(writer, DltConstants.TypeInfoUint | DltConstants.TypeInfoLength32Bit, arg.AsUInt32()); return;
+            case DltArgumentKind.Int64:  WriteScalar8(writer, DltConstants.TypeInfoSint | DltConstants.TypeInfoLength64Bit, unchecked((ulong)arg.AsInt64())); return;
+            case DltArgumentKind.UInt64: WriteScalar8(writer, DltConstants.TypeInfoUint | DltConstants.TypeInfoLength64Bit, arg.AsUInt64()); return;
+            case DltArgumentKind.Float32: WriteScalar4(writer, DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength32Bit, (uint)BitConverter.SingleToInt32Bits(arg.AsFloat32())); return;
+            case DltArgumentKind.Float64: WriteScalar8(writer, DltConstants.TypeInfoFloat | DltConstants.TypeInfoLength64Bit, (ulong)BitConverter.DoubleToInt64Bits(arg.AsFloat64())); return;
+            default: WriteString(arg.Kind.ToString(), writer); return;
         }
+    }
+
+    private static void WriteScalar1(ArrayBufferWriter<byte> w, uint info, byte v)
+    {
+        var span = w.GetSpan(4 + 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4], info);
+        span[4] = v;
+        w.Advance(4 + 1);
+    }
+
+    private static void WriteScalar2(ArrayBufferWriter<byte> w, uint info, ushort v)
+    {
+        var span = w.GetSpan(4 + 2);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4], info);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(4, 2), v);
+        w.Advance(4 + 2);
+    }
+
+    private static void WriteScalar4(ArrayBufferWriter<byte> w, uint info, uint v)
+    {
+        var span = w.GetSpan(4 + 4);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4], info);
+        BinaryPrimitives.WriteUInt32LittleEndian(span.Slice(4, 4), v);
+        w.Advance(4 + 4);
+    }
+
+    private static void WriteScalar8(ArrayBufferWriter<byte> w, uint info, ulong v)
+    {
+        var span = w.GetSpan(4 + 8);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4], info);
+        BinaryPrimitives.WriteUInt64LittleEndian(span.Slice(4, 8), v);
+        w.Advance(4 + 8);
     }
 
     private static void WriteString(string s, ArrayBufferWriter<byte> writer)
