@@ -1,0 +1,12 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+.idea/
+artifacts/
+*.nupkg
+*.snupkg
+TestResults/
+coverage.*.xml
+docs/superpowers/

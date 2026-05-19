@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <PackageId>Serilog.Sinks.Dlt</PackageId>
+    <Description>Serilog sink for COVESA DLT (Diagnostic Log and Trace) — daemon and file.</Description>
+    <PackageTags>serilog;sink;dlt;diagnostic;log;trace;automotive;covesa;genivi</PackageTags>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Serilog.Sinks.Dlt.Tests" />
+  </ItemGroup>
+</Project>
