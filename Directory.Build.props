@@ -11,6 +11,5 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>Patrick Dahlke</Authors>
     <Copyright>Copyright (c) 2026 Patrick Dahlke</Copyright>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 </Project>
