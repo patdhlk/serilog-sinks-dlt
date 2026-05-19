@@ -48,13 +48,47 @@ internal static class DltEncoder
 
     private static void WriteArgument(in DltArgument arg, ArrayBufferWriter<byte> writer)
     {
-        // Placeholder for Task 6 only. Real args added in Tasks 7-9. Emits a 1-byte ASCII STRG
-        // so headers can be exercised in isolation.
-        var info = DltConstants.TypeInfoString | DltConstants.TypeInfoLength16Bit | DltConstants.TypeInfoScodAscii;
-        var span = writer.GetSpan(4 + 2 + 1);
-        BinaryPrimitives.WriteUInt32LittleEndian(span[..4], info);
-        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(4, 2), 1);
-        span[6] = 0;
-        writer.Advance(7);
+        switch (arg.Kind)
+        {
+            case DltArgumentKind.String:
+                WriteString(arg.AsString(), writer);
+                break;
+            case DltArgumentKind.Bool:
+                WriteBool(arg.AsBool(), writer);
+                break;
+            default:
+                // Other kinds in Tasks 8-9.
+                WriteString(arg.Kind.ToString(), writer);
+                break;
+        }
+    }
+
+    private static void WriteString(string s, ArrayBufferWriter<byte> writer)
+    {
+        var byteLength = s.Length + 1;
+        if (byteLength > ushort.MaxValue) byteLength = ushort.MaxValue;
+
+        var span = writer.GetSpan(4 + 2 + byteLength);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4],
+            DltConstants.TypeInfoString | DltConstants.TypeInfoLength16Bit | DltConstants.TypeInfoScodAscii);
+        BinaryPrimitives.WriteUInt16LittleEndian(span.Slice(4, 2), (ushort)byteLength);
+
+        var payload = span.Slice(6, byteLength);
+        for (var i = 0; i < byteLength - 1; i++)
+        {
+            var c = s[i];
+            payload[i] = c < 0x80 ? (byte)c : (byte)'?';
+        }
+        payload[byteLength - 1] = 0;
+        writer.Advance(4 + 2 + byteLength);
+    }
+
+    private static void WriteBool(bool v, ArrayBufferWriter<byte> writer)
+    {
+        var span = writer.GetSpan(4 + 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(span[..4],
+            DltConstants.TypeInfoBool | DltConstants.TypeInfoLength8Bit);
+        span[4] = (byte)(v ? 1 : 0);
+        writer.Advance(4 + 1);
     }
 }
