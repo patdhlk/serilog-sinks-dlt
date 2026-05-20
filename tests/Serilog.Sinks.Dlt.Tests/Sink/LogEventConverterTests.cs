@@ -72,4 +72,33 @@ public class LogEventConverterTests
         var msg = NewConverter().Convert(ev);
         msg.ContextId.Should().NotBe("DFLT").And.HaveLength(4);
     }
+
+    [Fact]
+    public void Exception_appended_as_final_string_argument()
+    {
+        var parser = new MessageTemplateParser();
+        var ev = new LogEvent(DateTimeOffset.UtcNow, LogEventLevel.Error,
+            new InvalidOperationException("bad state"),
+            parser.Parse("boom"),
+            new List<LogEventProperty>());
+
+        var msg = NewConverter().Convert(ev);
+        msg.Arguments[msg.ArgumentCount - 1].Kind.Should().Be(DltArgumentKind.String);
+        msg.Arguments[msg.ArgumentCount - 1].AsString().Should().Contain("InvalidOperationException")
+            .And.Contain("bad state");
+    }
+
+    [Fact]
+    public void Argument_count_capped_at_255()
+    {
+        var props = new List<LogEventProperty>();
+        for (var i = 0; i < 400; i++)
+            props.Add(new LogEventProperty($"p{i}", new ScalarValue(i)));
+        var parser = new MessageTemplateParser();
+        var ev = new LogEvent(DateTimeOffset.UtcNow, LogEventLevel.Information, null,
+            parser.Parse("many"), props);
+
+        var msg = NewConverter().Convert(ev);
+        msg.ArgumentCount.Should().BeLessThanOrEqualTo(DltConstants.MaxArgumentCount);
+    }
 }
