@@ -4,6 +4,7 @@
     <PackageId>Serilog.Sinks.Dlt</PackageId>
     <Description>Serilog sink for COVESA DLT (Diagnostic Log and Trace) — daemon and file.</Description>
     <PackageTags>serilog;sink;dlt;diagnostic;log;trace;automotive;covesa;genivi</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -13,5 +14,8 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Serilog.Sinks.Dlt.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
