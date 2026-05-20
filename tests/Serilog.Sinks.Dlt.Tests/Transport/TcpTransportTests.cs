@@ -39,4 +39,30 @@ public class TcpTransportTests
         Func<Task> act = async () => await transport.ConnectAsync(CancellationToken.None);
         await act.Should().ThrowAsync<DltTransportException>();
     }
+
+    [Fact]
+    public async Task Reader_drains_bytes_the_peer_sends()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var acceptTask = listener.AcceptTcpClientAsync();
+
+        await using var transport = new TcpTransport("127.0.0.1", port);
+        await transport.ConnectAsync(CancellationToken.None);
+        using var server = await acceptTask;
+
+        var payload = new byte[16 * 1024];
+        new Random(42).NextBytes(payload);
+        await server.GetStream().WriteAsync(payload);
+
+        await Task.Delay(150);
+
+        await transport.WriteAsync(new byte[] { 0x42 }, CancellationToken.None);
+        var roundTripBuf = new byte[1];
+        await server.GetStream().ReadExactlyAsync(roundTripBuf, 0, 1);
+        roundTripBuf[0].Should().Be(0x42);
+
+        listener.Stop();
+    }
 }

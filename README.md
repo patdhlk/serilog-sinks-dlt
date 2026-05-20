@@ -65,16 +65,10 @@ The hot path enqueues onto a bounded channel (default capacity 10 000) and retur
 
 ## What's not in v1
 
-- **Full bidirectional daemon ingestion.** `WriteTo.Dlt(...)` connects to
-  `dlt-daemon` and successfully registers the application + contexts, but
-  the daemon doesn't currently persist our LOG messages to its offline
-  trace — `libdlt` is bidirectional (receiver thread drains daemon
-  responses) and our transport is write-only. The file sink
-  (`WriteTo.DltFile(...)`) is fully functional and produces output that
-  `dlt-convert` / `dlt-viewer` read without issue. See `docker/README.md`
-  for diagnostic details.
 - DLT non-verbose mode
-- Inbound DLT control messages (`SET_LOG_LEVEL` from daemon)
+- Acting on inbound DLT control messages (`SET_LOG_LEVEL` from daemon) —
+  the transport reads and discards them; it doesn't apply log-level
+  changes to a per-context filter
 - TLS for TCP
 - Multicast / UDP / serial transports
 

@@ -17,27 +17,29 @@ This Dockerfile clones COVESA `dlt-daemon` at v3.0.0 and builds it with
 socket. Build adds ~30 s to the first `docker build`; cached layers make
 subsequent rebuilds fast.
 
-## Known limitation: daemon ingestion is partial
+## How daemon ingestion works end-to-end
 
-The sink's daemon path (`WriteTo.Dlt(...)`) successfully:
-- Connects to `dlt-daemon` over the Unix socket
-- Sends `DltUserHeader` + `REGISTER_APPLICATION` — daemon accepts (`ApplicationID 'DEMO' registered`)
-- Sends `REGISTER_CONTEXT` for each unique CTID — daemon accepts (`ContextID 'DFLT' registered`)
-- Sends LOG messages with libdlt-compatible wire format (UEH + WEID + WSID + WTMS + VERS=1, plus SEID and DltUserHeader prefix)
+1. Container start → `entrypoint.sh` writes `LoggingMode = 3` (BOTH) to
+   `/tmp/dlt-runtime.cfg`. This is critical: the daemon's user-mode
+   defaults to `EXTERNAL` (forward-only) and offline-trace writing is
+   gated on `INTERNAL` or `BOTH`. Without this, the daemon receives
+   our messages but discards them silently.
+2. Daemon starts in the background, listening on `/tmp/dlt` (AF_UNIX) +
+   TCP 3490.
+3. Our sink connects → sends `DltUserHeader` + `REGISTER_APPLICATION`
+   greeting → daemon registers app.
+4. Each unique CTID triggers a `REGISTER_CONTEXT` from the dispatcher
+   before the first LOG with that context — matches libdlt's behavior.
+5. LOG messages are sent with libdlt-compatible HTYP (`UEH | WEID | WSID |
+   WTMS | VERS=1`) and `DltUserHeader(LOG)` prefix.
+6. A background reader-loop in the transport drains daemon-sent control
+   messages (`LOG_STATE`, `LOG_LEVEL`) so the daemon's send-side never
+   stalls. Bytes are discarded — we don't currently apply log-level
+   updates to a filter.
 
-But the daemon does not currently persist our LOG messages to its offline
-trace (`/var/log/dlt/`). Root cause appears architectural: `libdlt` is
-**bidirectional** — its `dlt_init()` spawns a receiver thread that reads
-daemon-sent control messages (`LOG_STATE`, `LOG_LEVEL`). Our sink is
-write-only. The daemon likely stops processing inputs from us after its
-send-side response gets stuck (our app never drains the response bytes).
-
-**What works fully today:** the file sink (`WriteTo.DltFile(...)`). The
-output is byte-correct DLT-format and `dlt-convert` / `dlt-viewer` read
-it without issue. The `demo.sh` script demonstrates this end-to-end.
-
-**Future work:** make the transport bidirectional (read-loop that drains
-inbound `DltUserHeader` control messages from the daemon).
+Result: messages land in the daemon's offline trace at `/var/log/dlt/`
+and `dlt-convert -a` decodes them correctly. The `demo.sh` script
+demonstrates this end-to-end.
 
 ## Build the image
 

@@ -11,6 +11,8 @@ internal sealed class TcpTransport : IDltTransport
     private readonly int _port;
     private readonly ReadOnlyMemory<byte> _greeting;
     private Socket? _socket;
+    private CancellationTokenSource? _readerCts;
+    private Task? _readerTask;
 
     public TcpTransport(string host, int port, ReadOnlyMemory<byte> greeting = default)
     {
@@ -42,6 +44,26 @@ internal sealed class TcpTransport : IDltTransport
             try { await WriteAsync(_greeting, ct).ConfigureAwait(false); }
             catch (DltTransportException) { _socket.Dispose(); _socket = null; throw; }
         }
+
+        _readerCts = new CancellationTokenSource();
+        _readerTask = Task.Run(() => DrainInboundAsync(_socket!, _readerCts.Token));
+    }
+
+    // See UnixSocketTransport.DrainInboundAsync for rationale.
+    private static async Task DrainInboundAsync(Socket socket, CancellationToken ct)
+    {
+        var buffer = new byte[4096];
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var n = await socket.ReceiveAsync(buffer, SocketFlags.None, ct).ConfigureAwait(false);
+                if (n == 0) return;
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (SocketException) { }
+        catch (ObjectDisposedException) { }
     }
 
     public async ValueTask WriteAsync(ReadOnlyMemory<byte> frame, CancellationToken ct)
@@ -67,10 +89,21 @@ internal sealed class TcpTransport : IDltTransport
         }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
+        _readerCts?.Cancel();
+        var reader = _readerTask;
         _socket?.Dispose();
         _socket = null;
-        return ValueTask.CompletedTask;
+
+        if (reader is not null)
+        {
+            try { await reader.ConfigureAwait(false); }
+            catch { }
+        }
+
+        _readerCts?.Dispose();
+        _readerCts = null;
+        _readerTask = null;
     }
 }

@@ -10,6 +10,8 @@ internal sealed class UnixSocketTransport : IDltTransport
     private readonly string _socketPath;
     private readonly ReadOnlyMemory<byte> _greeting;
     private Socket? _socket;
+    private CancellationTokenSource? _readerCts;
+    private Task? _readerTask;
 
     public UnixSocketTransport(string socketPath, ReadOnlyMemory<byte> greeting = default)
     {
@@ -40,6 +42,35 @@ internal sealed class UnixSocketTransport : IDltTransport
             try { await WriteAsync(_greeting, ct).ConfigureAwait(false); }
             catch (DltTransportException) { _socket.Dispose(); _socket = null; throw; }
         }
+
+        StartReader();
+    }
+
+    private void StartReader()
+    {
+        _readerCts = new CancellationTokenSource();
+        _readerTask = Task.Run(() => DrainInboundAsync(_socket!, _readerCts.Token));
+    }
+
+    // Bidirectional support: dlt-daemon sends control messages (LOG_STATE, LOG_LEVEL)
+    // back to applications after registration. libdlt has a receiver pthread that
+    // drains them; without that, the daemon's send-side eventually stalls and it
+    // stops processing our LOG messages. We don't interpret these responses —
+    // just drain so the daemon's send always succeeds.
+    private static async Task DrainInboundAsync(Socket socket, CancellationToken ct)
+    {
+        var buffer = new byte[4096];
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var n = await socket.ReceiveAsync(buffer, SocketFlags.None, ct).ConfigureAwait(false);
+                if (n == 0) return; // peer closed
+            }
+        }
+        catch (OperationCanceledException) { /* shutdown */ }
+        catch (SocketException) { /* connection lost — writer side will see it too */ }
+        catch (ObjectDisposedException) { /* socket disposed */ }
     }
 
     public async ValueTask WriteAsync(ReadOnlyMemory<byte> frame, CancellationToken ct)
@@ -65,10 +96,21 @@ internal sealed class UnixSocketTransport : IDltTransport
         }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        _socket?.Dispose();
+        _readerCts?.Cancel();
+        var reader = _readerTask;
+        _socket?.Dispose();   // unblocks any pending ReceiveAsync in the reader
         _socket = null;
-        return ValueTask.CompletedTask;
+
+        if (reader is not null)
+        {
+            try { await reader.ConfigureAwait(false); }
+            catch { /* swallow on dispose */ }
+        }
+
+        _readerCts?.Dispose();
+        _readerCts = null;
+        _readerTask = null;
     }
 }
