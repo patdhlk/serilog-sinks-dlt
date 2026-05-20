@@ -11,10 +11,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0   # SourceLink needs the full git history
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -39,7 +39,7 @@ jobs:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       - name: Upload artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nupkg-${{ steps.ver.outputs.version }}
           path: artifacts/*.nupkg
