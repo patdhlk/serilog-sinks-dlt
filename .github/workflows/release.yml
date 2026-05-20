@@ -9,9 +9,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # SourceLink needs the full git history
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
@@ -21,13 +23,23 @@ jobs:
         id: ver
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
       - name: Pack
-        run: dotnet pack src/Serilog.Sinks.Dlt -c Release -o artifacts/ -p:Version=${{ steps.ver.outputs.version }}
+        run: |
+          dotnet pack src/Serilog.Sinks.Dlt \
+            -c Release \
+            -o artifacts/ \
+            -p:Version=${{ steps.ver.outputs.version }} \
+            -p:ContinuousIntegrationBuild=true
       - name: Publish to NuGet
-        run: dotnet nuget push 'artifacts/*.nupkg' --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: |
+          dotnet nuget push 'artifacts/*.nupkg' \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nupkg
+          name: nupkg-${{ steps.ver.outputs.version }}
           path: artifacts/*.nupkg

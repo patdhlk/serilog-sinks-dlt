@@ -6,10 +6,31 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <RepositoryUrl>https://github.com/patdhlk/serilog-sinks-dlt</RepositoryUrl>
-    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- Versioning. Release workflow overrides via -p:Version=<tag>. -->
+    <VersionPrefix>0.1.0</VersionPrefix>
+
+    <!-- Package metadata -->
     <Authors>Patrick Dahlke</Authors>
+    <Company>Patrick Dahlke</Company>
     <Copyright>Copyright (c) 2026 Patrick Dahlke</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/patdhlk/serilog-sinks-dlt</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+
+    <!-- SourceLink: deterministic builds + embedded git/source info so users
+         can step into the sink from their debugger. Only active in CI;
+         locally there may be no remote yet, which would otherwise warn (and
+         with TreatWarningsAsErrors=true would fail the build). -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <DeterministicSourcePaths Condition="'$(GITHUB_ACTIONS)' == 'true'">true</DeterministicSourcePaths>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' != 'true'">
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
 </Project>
