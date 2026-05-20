@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Serilog.Core;
 using Serilog.Debugging;
 using Serilog.Events;
+using Serilog.Sinks.Dlt.Protocol;
 using Serilog.Sinks.Dlt.Transport;
 
 namespace Serilog.Sinks.Dlt.Sink;
@@ -20,10 +21,10 @@ public sealed class DltSink : ILogEventSink, IDisposable, IAsyncDisposable
         IDltTransport transport,
         int queueCapacity,
         TimeSpan shutdownTimeout,
-        bool useStorageHeader = false)
+        DltFramingMode framingMode = DltFramingMode.None)
     {
         _converter = new LogEventConverter(ecuId, appId, ctidResolver);
-        _dispatcher = new DltDispatcher(transport, queueCapacity, shutdownTimeout, useStorageHeader);
+        _dispatcher = new DltDispatcher(transport, queueCapacity, shutdownTimeout, framingMode);
     }
 
     public void Emit(LogEvent logEvent)

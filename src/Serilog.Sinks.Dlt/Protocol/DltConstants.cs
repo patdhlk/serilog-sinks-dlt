@@ -13,6 +13,10 @@ internal static class DltConstants
     // Composite HTYP we always use: UEH + WEID + WTMS + VERS=1, MSBF=0
     public const byte HtypDefault = HtypUseExtendedHeader | HtypWithEcuId | HtypWithTimestamp | HtypVersion1;
 
+    // HTYP including WSID — what libdlt v2.18.x sends. Ubuntu's dlt-daemon
+    // appears to require this to route LOG messages past registration.
+    public const byte HtypWithSession = HtypDefault | HtypWithSessionId;
+
     // Extended header MSIN bit fields (section 5.1.3.1)
     public const byte MsinVerbose       = 0x01;  // VERB
     public const byte MsinMessageTypeLog = 0x00; // MSTP = 0 (DLT_TYPE_LOG)

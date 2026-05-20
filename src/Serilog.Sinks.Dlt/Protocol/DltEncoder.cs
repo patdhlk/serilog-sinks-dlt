@@ -8,35 +8,69 @@ namespace Serilog.Sinks.Dlt.Protocol;
 internal static class DltEncoder
 {
     public static void Encode(in DltMessage msg, ArrayBufferWriter<byte> writer)
+        => EncodeInternal(msg, writer, sessionId: 0, includeSessionId: false);
+
+    /// <summary>
+    /// Encode with libdlt's HTYP flags including WSID. The session ID is the
+    /// PID, matching what libdlt sends. Ubuntu's dlt-daemon (v2.18) appears
+    /// to route LOG messages past application registration only when the
+    /// session-id is present.
+    /// </summary>
+    public static void EncodeWithSessionId(in DltMessage msg, ArrayBufferWriter<byte> writer, uint sessionId)
+        => EncodeInternal(msg, writer, sessionId, includeSessionId: true);
+
+    private static void EncodeInternal(in DltMessage msg, ArrayBufferWriter<byte> writer, uint sessionId, bool includeSessionId)
     {
         var startOffset = writer.WrittenCount;
         var argCount = Math.Min(msg.ArgumentCount, DltConstants.MaxArgumentCount);
 
-        var hdr = writer.GetSpan(DltConstants.StandardHeaderSize + DltConstants.ExtendedHeaderSize);
-        hdr[0] = DltConstants.HtypDefault;
+        // Standard header is 12 bytes without WSID, 16 with.
+        var stdHdrSize = includeSessionId
+            ? DltConstants.StandardHeaderSize + 4
+            : DltConstants.StandardHeaderSize;
+
+        var hdr = writer.GetSpan(stdHdrSize + DltConstants.ExtendedHeaderSize);
+        hdr[0] = includeSessionId ? DltConstants.HtypWithSession : DltConstants.HtypDefault;
         hdr[1] = msg.MessageCounter;
         // LEN at 2..3 patched after payload is written
         WriteId(hdr.Slice(4, 4), msg.EcuId);
-        BinaryPrimitives.WriteUInt32BigEndian(hdr.Slice(8, 4), msg.Timestamp);
+
+        var cursor = 8;
+        if (includeSessionId)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(hdr.Slice(cursor, 4), sessionId);
+            cursor += 4;
+        }
+        BinaryPrimitives.WriteUInt32BigEndian(hdr.Slice(cursor, 4), msg.Timestamp);
+        cursor += 4;
 
         var msin = (byte)(DltConstants.MsinVerbose
                           | DltConstants.MsinMessageTypeLog
                           | ((byte)msg.LogLevel << DltConstants.MsinLogLevelShift));
-        hdr[12] = msin;
-        hdr[13] = (byte)argCount;
-        WriteId(hdr.Slice(14, 4), msg.AppId);
-        WriteId(hdr.Slice(18, 4), msg.ContextId);
+        hdr[cursor] = msin;
+        hdr[cursor + 1] = (byte)argCount;
+        WriteId(hdr.Slice(cursor + 2, 4), msg.AppId);
+        WriteId(hdr.Slice(cursor + 6, 4), msg.ContextId);
 
-        writer.Advance(DltConstants.StandardHeaderSize + DltConstants.ExtendedHeaderSize);
+        writer.Advance(stdHdrSize + DltConstants.ExtendedHeaderSize);
 
         for (var i = 0; i < argCount; i++)
             WriteArgument(msg.Arguments[i], writer);
 
         var frameLength = writer.WrittenCount - startOffset;
-        // Patch LEN — MemoryMarshal.AsMemory converts WrittenMemory's read-only into writable
-        // without copying or reflection. ArrayBufferWriter<byte> is single-owner so this is safe.
         var writable = MemoryMarshal.AsMemory(writer.WrittenMemory);
         BinaryPrimitives.WriteUInt16BigEndian(writable.Span.Slice(startOffset + 2, 2), checked((ushort)frameLength));
+    }
+
+    public static void EncodeWithUserHeader(in DltMessage msg, ArrayBufferWriter<byte> writer)
+        => EncodeWithUserHeader(msg, writer, sessionId: (uint)Environment.ProcessId);
+
+    public static void EncodeWithUserHeader(in DltMessage msg, ArrayBufferWriter<byte> writer, uint sessionId)
+    {
+        var hdr = writer.GetSpan(DltUserFraming.UserHeaderSize);
+        DltUserFraming.WriteUserHeader(hdr, DltUserFraming.UserMessage.Log);
+        writer.Advance(DltUserFraming.UserHeaderSize);
+        EncodeWithSessionId(msg, writer, sessionId);
     }
 
     public static void EncodeWithStorageHeader(in DltMessage msg, ArrayBufferWriter<byte> writer)

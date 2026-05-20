@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Channels;
@@ -17,17 +18,17 @@ internal sealed class DltDispatcher : IAsyncDisposable, IDisposable
     private readonly TimeSpan _shutdownTimeout;
     private readonly Task _worker;
     private readonly CancellationTokenSource _workerCts = new();
-    private readonly bool _useStorageHeader;
+    private readonly DltFramingMode _framingMode;
     private long _droppedCount;
     private bool _disposed;
 
     public long DroppedCount => Interlocked.Read(ref _droppedCount);
 
-    public DltDispatcher(IDltTransport transport, int queueCapacity, TimeSpan shutdownTimeout, bool useStorageHeader = false)
+    public DltDispatcher(IDltTransport transport, int queueCapacity, TimeSpan shutdownTimeout, DltFramingMode framingMode = DltFramingMode.None)
     {
         _transport = transport;
         _shutdownTimeout = shutdownTimeout;
-        _useStorageHeader = useStorageHeader;
+        _framingMode = framingMode;
         _channel = Channel.CreateBounded<DltMessage>(
             new BoundedChannelOptions(queueCapacity)
             {
@@ -49,6 +50,12 @@ internal sealed class DltDispatcher : IAsyncDisposable, IDisposable
     {
         var buffer = new ArrayBufferWriter<byte>(initialCapacity: 1024);
         var lastSelfLog = Stopwatch.StartNew();
+        // For UserHeader framing we must send libdlt-style REGISTER_CONTEXT before
+        // the first LOG message for each (apid, ctid) pair, or dlt-daemon drops
+        // the logs silently. The set is cleared on transport failure so the next
+        // successful connection re-registers everything.
+        var registeredContexts = new HashSet<(string apid, string ctid)>();
+        var pid = Environment.ProcessId;
 
         try
         {
@@ -57,13 +64,32 @@ internal sealed class DltDispatcher : IAsyncDisposable, IDisposable
                 buffer.ResetWrittenCount();
                 try
                 {
-                    if (_useStorageHeader) DltEncoder.EncodeWithStorageHeader(msg, buffer);
-                    else DltEncoder.Encode(msg, buffer);
+                    if (_framingMode == DltFramingMode.UserHeader)
+                    {
+                        var key = (msg.AppId, msg.ContextId);
+                        if (registeredContexts.Add(key))
+                        {
+                            var ctxBytes = DltUserFraming.BuildRegisterContextMessage(msg.AppId, msg.ContextId, pid);
+                            await _transport.WriteAsync(ctxBytes, _workerCts.Token).ConfigureAwait(false);
+                        }
+                    }
+
+                    switch (_framingMode)
+                    {
+                        case DltFramingMode.StorageHeader: DltEncoder.EncodeWithStorageHeader(msg, buffer); break;
+                        case DltFramingMode.UserHeader:    DltEncoder.EncodeWithUserHeader(msg, buffer); break;
+                        default:                           DltEncoder.Encode(msg, buffer); break;
+                    }
                     await _transport.WriteAsync(buffer.WrittenMemory, _workerCts.Token).ConfigureAwait(false);
                 }
                 catch (DltTransportException ex)
                 {
                     SelfLog.WriteLine("DLT transport write failed: {0}", ex);
+                    // On any transport failure, forget which contexts we registered.
+                    // After a reconnect the daemon won't remember our app and we need
+                    // to re-send registration (which the transport's greeting handles)
+                    // and re-register every context (which this clear ensures).
+                    registeredContexts.Clear();
                 }
                 catch (OperationCanceledException) when (_workerCts.IsCancellationRequested)
                 {

@@ -8,13 +8,15 @@ namespace Serilog.Sinks.Dlt.Transport;
 internal sealed class UnixSocketTransport : IDltTransport
 {
     private readonly string _socketPath;
+    private readonly ReadOnlyMemory<byte> _greeting;
     private Socket? _socket;
 
-    public UnixSocketTransport(string socketPath)
+    public UnixSocketTransport(string socketPath, ReadOnlyMemory<byte> greeting = default)
     {
         if (string.IsNullOrWhiteSpace(socketPath))
             throw new ArgumentException("socketPath must be non-empty", nameof(socketPath));
         _socketPath = socketPath;
+        _greeting = greeting;
     }
 
     public bool IsConnected => _socket is { Connected: true };
@@ -31,6 +33,12 @@ internal sealed class UnixSocketTransport : IDltTransport
         {
             socket.Dispose();
             throw new DltTransportException($"Failed to connect to DLT daemon at {_socketPath}", ex);
+        }
+
+        if (!_greeting.IsEmpty)
+        {
+            try { await WriteAsync(_greeting, ct).ConfigureAwait(false); }
+            catch (DltTransportException) { _socket.Dispose(); _socket = null; throw; }
         }
     }
 

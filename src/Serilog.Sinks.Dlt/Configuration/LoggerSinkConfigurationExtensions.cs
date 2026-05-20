@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Sinks.Dlt.Protocol;
 using Serilog.Sinks.Dlt.Sink;
 using Serilog.Sinks.Dlt.Transport;
 
@@ -29,7 +31,8 @@ public static class LoggerSinkConfigurationExtensions
         Validate.Id(ecuId, nameof(ecuId));
         Validate.Id(defaultContextId, nameof(defaultContextId));
 
-        var inner = new UnixSocketTransport(socketPath);
+        var greeting = DltUserFraming.BuildRegisterApplicationMessage(appId, Environment.ProcessId);
+        var inner = new UnixSocketTransport(socketPath, greeting);
         var transport = new ReconnectingTransport(inner,
             reconnectInitialDelay ?? TimeSpan.FromMilliseconds(500),
             reconnectMaxDelay     ?? TimeSpan.FromSeconds(30),
@@ -38,7 +41,7 @@ public static class LoggerSinkConfigurationExtensions
         var sink = new Serilog.Sinks.Dlt.Sink.DltSink(
             ecuId, appId, new CtidResolver(defaultContextId, contextIdMap),
             transport, queueCapacity, shutdownTimeout ?? TimeSpan.FromSeconds(5),
-            useStorageHeader: false);
+            framingMode: DltFramingMode.UserHeader);
 
         return sinkConfig.Sink(sink, restrictedToMinimumLevel, levelSwitch);
     }
@@ -64,7 +67,8 @@ public static class LoggerSinkConfigurationExtensions
         Validate.Id(defaultContextId, nameof(defaultContextId));
         if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("host must be non-empty", nameof(host));
 
-        var inner = new TcpTransport(host, port);
+        var greeting = DltUserFraming.BuildRegisterApplicationMessage(appId, Environment.ProcessId);
+        var inner = new TcpTransport(host, port, greeting);
         var transport = new ReconnectingTransport(inner,
             reconnectInitialDelay ?? TimeSpan.FromMilliseconds(500),
             reconnectMaxDelay     ?? TimeSpan.FromSeconds(30),
@@ -73,7 +77,7 @@ public static class LoggerSinkConfigurationExtensions
         var sink = new Serilog.Sinks.Dlt.Sink.DltSink(
             ecuId, appId, new CtidResolver(defaultContextId, contextIdMap),
             transport, queueCapacity, shutdownTimeout ?? TimeSpan.FromSeconds(5),
-            useStorageHeader: false);
+            framingMode: DltFramingMode.UserHeader);
 
         return sinkConfig.Sink(sink, restrictedToMinimumLevel, levelSwitch);
     }
@@ -104,7 +108,7 @@ public static class LoggerSinkConfigurationExtensions
         var sink = new Serilog.Sinks.Dlt.Sink.DltSink(
             ecuId, appId, new CtidResolver(defaultContextId, contextIdMap),
             transport, queueCapacity, shutdownTimeout ?? TimeSpan.FromSeconds(5),
-            useStorageHeader: true);
+            framingMode: DltFramingMode.StorageHeader);
 
         return sinkConfig.Sink(sink, restrictedToMinimumLevel, levelSwitch);
     }

@@ -9,14 +9,16 @@ internal sealed class TcpTransport : IDltTransport
 {
     private readonly string _host;
     private readonly int _port;
+    private readonly ReadOnlyMemory<byte> _greeting;
     private Socket? _socket;
 
-    public TcpTransport(string host, int port)
+    public TcpTransport(string host, int port, ReadOnlyMemory<byte> greeting = default)
     {
         if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("host must be non-empty", nameof(host));
         if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
         _host = host;
         _port = port;
+        _greeting = greeting;
     }
 
     public bool IsConnected => _socket is { Connected: true };
@@ -33,6 +35,12 @@ internal sealed class TcpTransport : IDltTransport
         {
             socket.Dispose();
             throw new DltTransportException($"Failed to connect to DLT daemon at {_host}:{_port}", ex);
+        }
+
+        if (!_greeting.IsEmpty)
+        {
+            try { await WriteAsync(_greeting, ct).ConfigureAwait(false); }
+            catch (DltTransportException) { _socket.Dispose(); _socket = null; throw; }
         }
     }
 
