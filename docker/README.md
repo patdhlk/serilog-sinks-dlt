@@ -83,10 +83,46 @@ dlt-convert -a /var/log/dlt/*.dlt
 
 ## One-shot smoke test
 
-Runs build → sample → integration test → daemon trace dump, then exits:
+Runs build → sample → daemon trace dump, then exits:
 
 ```bash
 docker run --rm -v "$PWD:/workspace" serilog-sinks-dlt-dev demo.sh
+```
+
+When it finishes, the resulting `.dlt` files are on **your host** under
+`.demo-output/` (gitignored), ready to open in DLT Viewer:
+
+| File | What it is |
+|---|---|
+| `.demo-output/demo.dlt` | Sample's file-sink output (12 messages from `samples/Demo`) |
+| `.demo-output/daemon-trace/*.dlt` | Same 12 messages as the daemon recorded them in its offline trace, plus daemon's own internal startup/registration entries |
+
+In **DLT Viewer**: `File → Open DLT File...` → point at either of the
+above. Both decode to the same logical content but use slightly
+different framing (the sample file has DLT storage headers per message;
+the daemon's offline trace files have the daemon's own storage layout).
+
+## Watching the daemon live from DLT Viewer (TCP)
+
+dlt-daemon listens on TCP `3490` for monitor clients (dlt-receive,
+dlt-viewer). To attach DLT Viewer to the running daemon from your host,
+publish the port when starting the container:
+
+```bash
+docker run --rm -it -p 3490:3490 -v "$PWD:/workspace" serilog-sinks-dlt-dev
+```
+
+Then in DLT Viewer:
+1. **Project → New ECU...**
+2. ECU ID: `ECU1` (matches the sample's default)
+3. Interface type: `TCP/IP`
+4. Hostname: `127.0.0.1`, Port: `3490`
+5. Connect — you'll see live messages as the sample runs.
+
+Inside the still-running container, fire the sample whenever you want:
+
+```bash
+dotnet run --project samples/Demo -- /workspace/.demo-output/demo.dlt
 ```
 
 ## How it's wired

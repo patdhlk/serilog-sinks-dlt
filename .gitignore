@@ -10,3 +10,4 @@ artifacts/
 TestResults/
 coverage.*.xml
 docs/superpowers/
+.demo-output/
