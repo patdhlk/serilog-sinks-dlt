@@ -46,12 +46,19 @@ public class FileTransportTests : IDisposable
     public async Task Rotation_rolls_when_size_limit_exceeded()
     {
         var path = Path("roll.dlt");
-        await using var transport = new FileTransport(path, fileSizeLimitBytes: 10, retainedFileCountLimit: 3);
+        var transport = new FileTransport(path, fileSizeLimitBytes: 10, retainedFileCountLimit: 3);
 
         await transport.WriteAsync(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 }, CancellationToken.None);
         File.Exists(Path("roll.dlt.0")).Should().BeFalse();
 
         await transport.WriteAsync(new byte[] { 9, 10, 11, 12, 13 }, CancellationToken.None);
+
+        // Dispose before reading the active file. The transport holds it
+        // open with FileShare.Read; on Linux that's enough for ReadAllBytes
+        // but Windows enforces sharing strictly — the reader's FileShare.Read
+        // doesn't permit the writer's still-open Write handle.
+        await transport.DisposeAsync();
+
         File.Exists(Path("roll.dlt.0")).Should().BeTrue("first batch should be in roll.dlt.0");
         File.ReadAllBytes(Path("roll.dlt.0")).Should().Equal(1, 2, 3, 4, 5, 6, 7, 8);
         File.ReadAllBytes(path).Should().Equal(9, 10, 11, 12, 13);
