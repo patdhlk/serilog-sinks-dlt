@@ -32,3 +32,47 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: '**/TestResults/*.trx'
+
+  integration-dlt-daemon:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+      - name: Install dlt-daemon
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dlt-daemon dlt-tools
+          dlt-daemon --version
+      - name: Configure dlt-daemon
+        run: |
+          sudo mkdir -p /var/log/dlt
+          sudo chmod 777 /var/log/dlt
+          sudo tee /etc/dlt.conf > /dev/null <<EOF
+          OfflineTraceDirectory = /var/log/dlt
+          OfflineTraceFileSize = 10000000
+          OfflineTraceMaxSize = 50000000
+          ControlSocketPath = /tmp/dlt-ctrl.sock
+          EOF
+      - name: Start dlt-daemon
+        run: |
+          sudo dlt-daemon -d -c /etc/dlt.conf
+          for _ in {1..10}; do
+            test -S /tmp/dlt && break
+            sleep 0.5
+          done
+      - name: Run integration tests
+        env:
+          DLT_DAEMON_AVAILABLE: '1'
+          DLT_SOCKET_PATH: /tmp/dlt
+          DLT_TRACE_DIR: /var/log/dlt
+        run: dotnet test tests/Serilog.Sinks.Dlt.IntegrationTests -c Release --filter "Category=RealDaemon" --logger "trx"
+      - name: Show daemon trace on failure
+        if: failure()
+        run: |
+          ls -la /var/log/dlt
+          sudo dlt-convert -a /var/log/dlt/*.dlt || true
