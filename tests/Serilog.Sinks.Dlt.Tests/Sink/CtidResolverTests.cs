@@ -38,4 +38,47 @@ public class CtidResolverTests
         foreach (var c in ctid)
             (char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c)).Should().BeTrue();
     }
+
+    [Fact]
+    public void Verbatim_option_uses_valid_short_context_as_is()
+    {
+        var r = new CtidResolver("DFLT", overrides: null, useSourceContextAsCtid: true);
+        r.Resolve("SENS").Should().Be("SENS");
+        r.Resolve("AX").Should().Be("AX");
+    }
+
+    [Fact]
+    public void Verbatim_option_off_still_hashes_short_context()
+    {
+        var r = new CtidResolver("DFLT", overrides: null);
+        r.Resolve("SENS").Should().NotBe("SENS");
+    }
+
+    [Theory]
+    [InlineData("SENS ")]          // 5 chars
+    [InlineData("MyApp.Service")]  // long
+    [InlineData("ÄB")]             // non-ASCII
+    [InlineData("A\tB")]           // control char
+    public void Verbatim_option_hashes_invalid_ctid(string ctx)
+    {
+        var r = new CtidResolver("DFLT", overrides: null, useSourceContextAsCtid: true);
+        var hashed = new CtidResolver("DFLT", overrides: null).Resolve(ctx);
+        r.Resolve(ctx).Should().Be(hashed);
+    }
+
+    [Fact]
+    public void Verbatim_option_does_not_beat_explicit_override()
+    {
+        var overrides = new Dictionary<string, string> { ["SENS"] = "SNS1" };
+        var r = new CtidResolver("DFLT", overrides, useSourceContextAsCtid: true);
+        r.Resolve("SENS").Should().Be("SNS1");
+    }
+
+    [Fact]
+    public void Verbatim_option_empty_context_yields_default()
+    {
+        var r = new CtidResolver("DFLT", overrides: null, useSourceContextAsCtid: true);
+        r.Resolve("").Should().Be("DFLT");
+        r.Resolve(null).Should().Be("DFLT");
+    }
 }
