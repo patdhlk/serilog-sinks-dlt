@@ -24,7 +24,8 @@ public static class LoggerSinkConfigurationExtensions
         TimeSpan? reconnectInitialDelay = null,
         TimeSpan? reconnectMaxDelay = null,
         TimeSpan? shutdownTimeout = null,
-        IReadOnlyDictionary<string, string>? contextIdMap = null)
+        IReadOnlyDictionary<string, string>? contextIdMap = null,
+        bool useSourceContextAsCtid = false)
     {
         ArgumentNullException.ThrowIfNull(sinkConfig);
         Validate.Id(appId, nameof(appId));
@@ -39,7 +40,7 @@ public static class LoggerSinkConfigurationExtensions
             TimeProvider.System);
 
         var sink = new Serilog.Sinks.Dlt.Sink.DltSink(
-            ecuId, appId, new CtidResolver(defaultContextId, contextIdMap),
+            ecuId, appId, new CtidResolver(defaultContextId, contextIdMap, useSourceContextAsCtid),
             transport, queueCapacity, shutdownTimeout ?? TimeSpan.FromSeconds(5),
             framingMode: DltFramingMode.UserHeader);
 
@@ -59,7 +60,8 @@ public static class LoggerSinkConfigurationExtensions
         TimeSpan? reconnectInitialDelay = null,
         TimeSpan? reconnectMaxDelay = null,
         TimeSpan? shutdownTimeout = null,
-        IReadOnlyDictionary<string, string>? contextIdMap = null)
+        IReadOnlyDictionary<string, string>? contextIdMap = null,
+        bool useSourceContextAsCtid = false)
     {
         ArgumentNullException.ThrowIfNull(sinkConfig);
         Validate.Id(appId, nameof(appId));
@@ -75,7 +77,7 @@ public static class LoggerSinkConfigurationExtensions
             TimeProvider.System);
 
         var sink = new Serilog.Sinks.Dlt.Sink.DltSink(
-            ecuId, appId, new CtidResolver(defaultContextId, contextIdMap),
+            ecuId, appId, new CtidResolver(defaultContextId, contextIdMap, useSourceContextAsCtid),
             transport, queueCapacity, shutdownTimeout ?? TimeSpan.FromSeconds(5),
             framingMode: DltFramingMode.UserHeader);
 
@@ -94,7 +96,8 @@ public static class LoggerSinkConfigurationExtensions
         int retainedFileCountLimit = 10,
         int queueCapacity = 10_000,
         TimeSpan? shutdownTimeout = null,
-        IReadOnlyDictionary<string, string>? contextIdMap = null)
+        IReadOnlyDictionary<string, string>? contextIdMap = null,
+        bool useSourceContextAsCtid = false)
     {
         ArgumentNullException.ThrowIfNull(sinkConfig);
         if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("path must be non-empty", nameof(path));
@@ -106,7 +109,7 @@ public static class LoggerSinkConfigurationExtensions
 
         var transport = new FileTransport(path, fileSizeLimitBytes, retainedFileCountLimit);
         var sink = new Serilog.Sinks.Dlt.Sink.DltSink(
-            ecuId, appId, new CtidResolver(defaultContextId, contextIdMap),
+            ecuId, appId, new CtidResolver(defaultContextId, contextIdMap, useSourceContextAsCtid),
             transport, queueCapacity, shutdownTimeout ?? TimeSpan.FromSeconds(5),
             framingMode: DltFramingMode.StorageHeader);
 

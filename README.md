@@ -40,7 +40,7 @@ Three sink methods:
 | `.WriteTo.DltTcp(appId, host, port, ...)` | `dlt-daemon` over TCP/IP |
 | `.WriteTo.DltFile(path, appId, ...)` | rotating `.dlt` file with DLT storage header |
 
-All accept `ecuId`, `defaultContextId`, `queueCapacity`, `shutdownTimeout`, and `contextIdMap`, plus method-specific options (reconnect timings for the daemon paths, size/retention for the file path).
+All accept `ecuId`, `defaultContextId`, `queueCapacity`, `shutdownTimeout`, `contextIdMap`, and `useSourceContextAsCtid`, plus method-specific options (reconnect timings for the daemon paths, size/retention for the file path).
 
 ### `appsettings.json` configuration
 

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-05
+
+### Added
+
+- `useSourceContextAsCtid` option on `Dlt`, `DltTcp` and `DltFile` (default `false`). When enabled, a `SourceContext` that is already a valid DLT ID (1–4 printable ASCII characters) is used verbatim as the CTID; explicit `contextIdMap` entries still take precedence, and anything else is hashed as before.
+
 ## [0.1.0] - 2026-05-20
 
 ### Added
@@ -24,5 +30,6 @@ Initial release. End-to-end verified against COVESA `dlt-daemon` v3.0.0.
 - **Docker dev container** that builds `dlt-daemon` from source with Unix-socket IPC, plus `demo.sh` end-to-end smoke test that drops result files into `.demo-output/` for opening in DLT Viewer.
 - **CI** on Ubuntu / Windows / macOS for unit tests, plus a Linux job that runs the integration test against the running daemon inside the dev container.
 
-[Unreleased]: https://github.com/patdhlk/serilog-sinks-dlt/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/patdhlk/serilog-sinks-dlt/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/patdhlk/serilog-sinks-dlt/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/patdhlk/serilog-sinks-dlt/releases/tag/v0.1.0
