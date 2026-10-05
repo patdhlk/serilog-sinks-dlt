@@ -53,14 +53,21 @@ public class LoggerSinkConfigurationExtensionsTests
     public void DltFile_with_verbatim_ctid_writes_ctid_unchanged()
     {
         var dir = System.IO.Directory.CreateTempSubdirectory();
-        var path = System.IO.Path.Combine(dir.FullName, "x.dlt");
-        using (var log = new LoggerConfiguration()
-                   .WriteTo.DltFile(path, appId: "TEST", useSourceContextAsCtid: true)
-                   .CreateLogger())
+        try
         {
-            log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, "SENS").Information("hi");
+            var path = System.IO.Path.Combine(dir.FullName, "x.dlt");
+            using (var log = new LoggerConfiguration()
+                       .WriteTo.DltFile(path, appId: "TEST", useSourceContextAsCtid: true)
+                       .CreateLogger())
+            {
+                log.ForContext(Serilog.Core.Constants.SourceContextPropertyName, "SENS").Information("hi");
+            }
+            var bytes = System.IO.File.ReadAllBytes(System.IO.Directory.GetFiles(dir.FullName, "*.dlt")[0]);
+            System.Text.Encoding.ASCII.GetString(bytes).Should().Contain("TESTSENS");
         }
-        var bytes = System.IO.File.ReadAllBytes(System.IO.Directory.GetFiles(dir.FullName, "*.dlt")[0]);
-        System.Text.Encoding.ASCII.GetString(bytes).Should().Contain("TESTSENS");
+        finally
+        {
+            dir.Delete(recursive: true);
+        }
     }
 }

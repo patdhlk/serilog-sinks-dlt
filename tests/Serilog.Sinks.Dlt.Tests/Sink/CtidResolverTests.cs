@@ -81,4 +81,26 @@ public class CtidResolverTests
         r.Resolve("").Should().Be("DFLT");
         r.Resolve(null).Should().Be("DFLT");
     }
+
+    [Fact]
+    public void Verbatim_option_tilde_resolves_verbatim()
+    {
+        var r = new CtidResolver("DFLT", overrides: null, useSourceContextAsCtid: true);
+        r.Resolve("~~~~").Should().Be("~~~~");
+    }
+
+    [Fact]
+    public void Verbatim_option_space_resolves_verbatim()
+    {
+        var r = new CtidResolver("DFLT", overrides: null, useSourceContextAsCtid: true);
+        r.Resolve(" ").Should().Be(" ");
+    }
+
+    [Fact]
+    public void Verbatim_option_del_character_hashes()
+    {
+        var r = new CtidResolver("DFLT", overrides: null, useSourceContextAsCtid: true);
+        var hashed = new CtidResolver("DFLT", overrides: null).Resolve("A\u007F");
+        r.Resolve("A\u007F").Should().Be(hashed);
+    }
 }

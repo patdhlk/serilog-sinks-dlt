@@ -64,7 +64,7 @@ All accept `ecuId`, `defaultContextId`, `queueCapacity`, `shutdownTimeout`, `con
 |---|---|
 | `ECU`  | `ecuId` option (default `"ECU1"`) |
 | `APID` | `appId` option (required) |
-| `CTID` | hashed from Serilog `SourceContext` (FNV-1a → 4-char base32); override via `contextIdMap` or fall back to `defaultContextId` |
+| `CTID` | hashed from Serilog `SourceContext` (FNV-1a → 4-char base32); override via `contextIdMap` or fall back to `defaultContextId`; or if `useSourceContextAsCtid: true`, use a SourceContext that is already a valid 1–4 char ASCII ID verbatim |
 | Log level | Verbose→6, Debug→5, Information→4, Warning→3, Error→2, Fatal→1 |
 
 ## Behavior under load
